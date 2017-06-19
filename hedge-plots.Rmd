@@ -1,0 +1,397 @@
+---
+title: "Hedging-hyperprior"
+author: "Steve Simon"
+date: "June 19, 2017"
+output: html_document
+---
+
+```{r initial-steps}
+ct <- function(la,sr=0) {
+  plot(0:1,0:1,type="n",axes=FALSE,xlab=" ",ylab=" ")
+  text(0.5,0.5,la,srt=sr,cex=2)
+}
+
+pl2 <- function(y) {
+  plot(x,y,type="l",axes=FALSE,xlab=" ",ylab=" ")
+  axis(side=1,at=(0:10)/10,cex=2)
+}
+
+plb <- function(y) {
+  barplot(y,axes=FALSE,xlab=" ",ylab=" ",space=0,col="white")
+  axis(side=1,at=(0:10)*2.5,labels=(0:10)/10,cex=2)
+ }
+
+dens.uniform <- function(tau) {dunif(tau,0.00,1.00)}
+dens.beta0510 <- function(tau) {dbeta(tau,0.5,1)}
+dens.beta1510 <- function(tau) {dbeta(tau,1.5,1)}
+dens.beta1015 <- function(tau) {dbeta(tau,1,1.5)}
+dens.beta1090 <- function(tau) {dbeta(tau,1,9)}
+dens.beta9010 <- function(tau) {dbeta(tau,9,1)}
+dens.beta0611 <- function(tau) {dbeta(tau,0.6,1.1)}
+dens.beta0914 <- function(tau) {dbeta(tau,0.9,1.4)}
+
+tau.grid <- function(g=1000, tau.max=1, rep=g) {
+  v0 <- 1/(2*g)
+  v1 <- 1-v0
+  tau.val <- tau.max*seq(v0, v1, length=g)
+  return(rep(tau.val, each=rep))
+}
+tau.grid(10)
+tau.grid(100,tau.max=2,rep=1)
+
+pi.grid <- function(g=1000,rep=g) {
+  v0 <- 1/(2*g)
+  v1 <- 1-v0
+  pi.val <- seq(v0, v1, length=g)
+  return(rep(pi.val, times=rep))
+}
+pi.grid(10)
+pi.grid(100,1)
+
+prior.surface <- function(pi, tau, hp=dens.uniform, alpha=4, beta=16, delta=0) {
+  dbeta(pi, delta+(alpha-delta)*tau, delta+(beta-delta)*tau)*hp(tau)
+}
+
+persp.prior <- function(hp=dens.uniform, alpha=4, beta=16,
+                        g=100, xmax=1, delta=0) {
+  library("plot3D")
+  tau <- tau.grid(g, xmax)
+  pi <- pi.grid(g)
+  d <- matrix(prior.surface(pi, tau, hp, alpha, beta, delta), nrow=g, byrow=TRUE)
+  truncate.d <- d
+  truncate.d[d>13.3] <- 13.3
+  persp3D(x=tau.grid(g,xmax,rep=1),
+        y=pi.grid(g,rep=1),
+        z=truncate.d,
+        theta=40, phi=20,
+        xlab="tau", ylab="pi",
+        zlab="Density",zlim=c(0,13.3),
+        colvar=FALSE,
+        border="black")
+  text3D(x=-0.12,y=-0.12,z=0,labels="pi=0\ntau=0",add=TRUE)
+  text3D(x= 1.04,y= 0.04,z=0,labels="pi=0\ntau=1",add=TRUE)
+  text3D(x= 1.02,y= 1.02,z=0,labels="pi=1\ntau=1",add=TRUE)
+  return(d)
+}
+tst<- persp.prior()
+
+p.slice <- function(tau, alpha=4, beta=16, ymax=6.5, hp=dens.uniform, delta=0) {
+  p <- pi.grid(rep=1)
+  d <- prior.surface(p, tau, hp=hp, delta=delta)
+  ymax <- max(ymax,d,na.rm=TRUE)
+  plot(p, d, ylim=c(0,ymax), type="l", xlab="p", ylab="density",axes=FALSE)
+  return(d)
+}
+
+tau.slice <- function(p, alpha=4, beta=16, ymax=0, prior.tau=dens.uniform, delta=0) {
+  tau <- tau.grid(rep=1)
+  d <- prior.surface(p, tau, hp=prior.tau, delta=delta)
+  ymax=max(ymax,d,na.rm=TRUE)
+  plot(tau, d, ylim=c(0,1.2*ymax), type="l", xlab="tau", ylab="density",axes=FALSE)
+  axis(side=2,at=c(0,max(pretty(d))))
+  box()
+  text(0.5,1.1*ymax,paste("pi =",p))
+  return(d)
+}
+
+likelihood.curve <- function(pi, x=54, n=60) {
+  dbinom(x, n, pi)
+}
+
+persp.likelihood <- function(x=54, n=60,
+                             g=100, xmax=1) {
+  pi <- pi.grid(g)
+  d <- matrix(likelihood.curve(pi, x, n), nrow=g, byrow=TRUE)
+  persp(z=d, theta=40, phi=20,
+        xlab="tau", ylab="pi", zlab="Likelihood")
+  return(d)
+}
+
+persp.posterior <- function(hp=dens.uniform, alpha=4, beta=16, x=54, n=60,
+                            g=100, xmax=1) {
+  tau <- tau.grid(g, xmax)
+  pi <- pi.grid(g)
+  s1 <- prior.surface(pi, tau, hp, alpha, beta)
+  s2 <- likelihood.curve(pi, x, n)
+  s3 <- matrix(s1*s2, nrow=g, byrow=TRUE)
+  persp(z=s3, theta=40, phi=20,
+        xlab="tau", ylab="pi", zlab="Density")
+  return(s3)
+}
+
+# obsolete: ag <- function(n) {seq(1/(2*n), 1-1/(2*n), length=n)}
+
+png(file="bb01.png",width=900,height=300)
+layout(matrix(1:12,nrow=2,byrow=TRUE),
+       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
+par(mar=c(2.1,2.1,0.6,0.6))
+x <- (1:999)/1000
+ct("dbeta(x,4,16)",90)
+pl2(dbeta(x,4,16))
+frame()
+frame()
+frame()
+frame()
+par(mar=c(0.1,2.1,0.1,0.6))
+frame()
+ct("Prior")
+dev.off()
+
+png(file="bb02.png",width=900,height=300)
+layout(matrix(1:12,nrow=2,byrow=TRUE),
+       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
+par(mar=c(2.1,2.1,0.6,0.6))
+x <- (1:999)/1000
+frame()
+frame()
+ct("dbinom(18,60,x)",90)
+pl2(dbinom(18,60,x))
+frame()
+frame()
+par(mar=c(0.1,2.1,0.1,0.6))
+frame()
+frame()
+frame()
+ct("Likelihood")
+dev.off()
+
+png(file="bb03.png",width=900,height=300)
+layout(matrix(1:12,nrow=2,byrow=TRUE),
+       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
+par(mar=c(2.1,2.1,0.6,0.6))
+x <- (1:999)/1000
+frame()
+frame()
+frame()
+frame()
+ct("dbeta(x,22,58)",90)
+pl2(dbeta(x,22,58))
+par(mar=c(0.1,2.1,0.1,0.6))
+frame()
+frame()
+frame()
+frame()
+frame()
+ct("Posterior")
+dev.off()
+
+png(file="bb04.png",width=900,height=300)
+layout(matrix(1:12,nrow=2,byrow=TRUE),
+       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
+par(mar=c(2.1,2.1,0.6,0.6))
+x <- (1:999)/1000
+ct("dbeta(x,4,16)",90)
+pl2(dbeta(x,4,16))
+ct("dbinom(18,60,x)",90)
+pl2(dbinom(18,60,x))
+ct("dbeta(x,22,58)",90)
+pl2(dbeta(x,22,58))
+par(mar=c(0.1,2.1,0.1,0.6))
+frame()
+ct("Prior")
+ct("X")
+ct("Likelihood")
+ct(expression(phantom(0) %prop% phantom(0)))
+ct("Posterior")
+dev.off()
+
+png(file="bb05.png",width=900,height=300)
+layout(matrix(1:12,nrow=2,byrow=TRUE),
+       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
+par(mar=c(2.1,2.1,0.6,0.6))
+x <- (4*(1:25)-2)/100
+ct("dbeta(x,4,16)",90)
+plb(dbeta(x,4,16))
+ct("dbinom(18,60,x)",90)
+plb(dbinom(18,60,x))
+ct("dbeta(x,22,58)",90)
+plb(dbeta(x,22,58))
+par(mar=c(0.1,2.1,0.1,0.6))
+frame()
+ct("Prior")
+ct("X")
+ct("Likelihood")
+ct(expression(phantom(0) %prop% phantom(0)))
+ct("Posterior")
+dev.off()
+
+png(file="bb06.png",width=900,height=300)
+layout(matrix(1:12,nrow=2,byrow=TRUE),
+       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
+par(mar=c(2.1,2.1,0.6,0.6))
+x <- (1:999)/1000
+ct("dbeta(x,4,16)",90)
+pl2(dbeta(x,4,16))
+ct("dbinom(54,60,x)",90)
+pl2(dbinom(54,60,x))
+ct("dbeta(x,58,22)",90)
+pl2(dbeta(x,58,22))
+par(mar=c(0.1,2.1,0.1,0.6))
+frame()
+ct("Prior")
+ct("X")
+ct("Likelihood")
+ct(expression(phantom(0) %prop% phantom(0)))
+ct("Posterior")
+dev.off()
+
+library("rjags")
+dat.bb <- list(a=4,b=16,x=18,n=60)
+mod.bb <- jags.model("jbb.txt",dat.bb)
+update(mod.bb,1000)
+out.bb <- coda.samples(mod.bb, "p", 1000)
+summary(out.bb)
+
+dat.bb <- list(a=4,b=16,x=54,n=60)
+mod.bb <- jags.model("jbb.txt",dat.bb)
+update(mod.bb,1000)
+out.bb <- coda.samples(mod.bb, "p", 1000)
+summary(out.bb)
+
+png(file="bb07.png",width=900,height=450)
+harmonic.mean <- function(x) {1/mean(1/x)}
+dat.ubb.bad <- list(a=4,b=16,x=54,n=60)
+mod.ubb.bad <- jags.model("jubb.txt",dat.ubb.bad)
+update(mod.ubb.bad,1000)
+out.ubb.bad <- coda.samples(mod.ubb.bad,c("pi","post.n"), 1000)
+summary(out.ubb.bad)
+plot(out.ubb.bad)
+harmonic.mean(unlist(out.ubb.bad[,"post.n"]))
+dev.off()
+
+png(file="bb08.png",width=900,height=450)
+dat.ubb.good <- list(a=4,b=16,x=18,n=60)
+mod.ubb.good <- jags.model("jubb.txt",dat.ubb.good)
+update(mod.ubb.good,1000)
+out.ubb.good <- coda.samples(mod.ubb.good,c("pi","post.n"), 1000)
+summary(out.ubb.good)
+plot(out.ubb.good)
+harmonic.mean(unlist(out.ubb.good[,"post.n"]))
+dev.off()
+
+png(file="bb09.png",width=450,height=450)
+par(mar=rep(0.6,4))
+surf1 <- persp.prior()
+dev.off()
+
+png(file="bb10.png",width=600,height=450)
+layout(matrix(c(rep(1,25),2:6),nrow=5,byrow=FALSE))
+par(mar=rep(0.6,4))
+surf1 <- persp.prior()
+p.slice(1)
+text(0.5,5.5,"Tau = 1",cex=2)
+box()
+p.slice(0.8)
+text(0.5,5.5,"Tau = 0.8",cex=2)
+box()
+p.slice(0.6)
+text(0.5,5.5,"Tau = 0.6",cex=2)
+box()
+p.slice(0.4)
+text(0.5,5.5,"Tau = 0.4",cex=2)
+box()
+p.slice(0.2)
+text(0.5,5.5,"Tau = 0.2",cex=2)
+box()
+dev.off()
+
+png(file="bb11.png",width=600,height=450)
+layout(matrix(c(rep(1,25),2:6),nrow=5,byrow=FALSE))
+par(mar=rep(0.6,4))
+surf1 <- persp.prior()
+r1 <- tau.slice(0.2)
+r2 <- tau.slice(0.3)
+r3 <- tau.slice(0.5)
+r4 <- tau.slice(0.7)
+r5 <- tau.slice(0.9)
+dev.off()
+
+
+png(file="bb12.png",width=900,height=300)
+layout(matrix(1:4,nrow=2,byrow=TRUE),
+       widths=c(0.5,0.5),heights=c(9,1)/10)
+par(mar=rep(0.6,4))
+surf2a <- persp.likelihood(x=18, n=60)
+surf2b <- persp.likelihood(x=54, n=60)
+ct("Likelihood for x=18, n=60")
+ct("Likelihood for x=54, n=60")
+dev.off()
+
+png(file="bb13.png",width=900,height=300)
+layout(matrix(1:12,nrow=2,byrow=TRUE),
+       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
+par(mar=rep(0.6,4))
+frame()
+surf1 <- persp.prior()
+frame()
+surf2 <- persp.likelihood(x=18, n=60)
+frame()
+surf3 <- persp.posterior(x=18, n=60)
+frame()
+ct("Prior")
+ct("X")
+ct("Likelihood")
+ct(expression(phantom(0) %prop% phantom(0)))
+ct("Posterior")
+dev.off()
+
+png(file="bb14.png",width=900,height=300)
+layout(matrix(1:12,nrow=2,byrow=TRUE),
+       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
+par(mar=rep(0.6,4))
+frame()
+surf1 <- persp.prior()
+frame()
+surf2 <- persp.likelihood(x=54, n=60)
+frame()
+surf3 <- persp.posterior(x=54, n=60)
+frame()
+ct("Prior")
+ct("X")
+ct("Likelihood")
+ct(expression(phantom(0) %prop% phantom(0)))
+ct("Posterior")
+dev.off()
+
+etau <- function(surf,scale=FALSE) {
+  stot <- apply(surf,2,sum)
+  sprb <- sweep(surf,2,stot,"/")
+  tg <- tau.grid(100,rep=1)
+  am <- as.vector(tg %*% sprb)
+  sf <- ifelse(scale,max(am),1)
+  am <- am/sf
+  hm <- 1/((1/post.n) %*% sprb)
+  par(mar=rep(2.6,4))
+  plot(tg,am,type="l",ylim=c(0,1),axes=FALSE,xlab=" ",ylab=" ")
+  axis(side=1,at=(0:10)/10)
+  axis(side=2,at=(0:4)/4)
+  title("E[tau|pi]")
+  return(list(x=tg,y=am))
+}
+
+png(file="bb15.png",width=600,height=300)
+ref0 <- etau(surf1)
+box()
+dev.off()
+
+png(file="bb16.png",width=600,height=300)
+ref1 <- etau(surf1,scale=TRUE)
+box()
+dev.off()
+
+png(file="bb17.png",width=450,height=450)
+par(mar=rep(0.6,4))
+surf2 <- persp.prior(hp=dens.beta0510)
+dev.off()
+
+png(file="bb18.png",width=600,height=300)
+etau(surf2,scale=TRUE)
+lines(ref1,lty="dashed")
+dev.off()
+
+png(file="bb19.png",width=450,height=450)
+par(mar=rep(0.6,4))
+surf3 <- persp.prior(delta=1)
+dev.off()
+```
+
