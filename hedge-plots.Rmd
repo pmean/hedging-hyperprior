@@ -19,61 +19,133 @@ pl2 <- function(y) {
 plb <- function(y) {
   barplot(y,axes=FALSE,xlab=" ",ylab=" ",space=0,col="white")
   axis(side=1,at=(0:10)*2.5,labels=(0:10)/10,cex=2)
- }
+}
 
 dens.uniform <- function(tau) {dunif(tau,0.00,1.00)}
 dens.beta0510 <- function(tau) {dbeta(tau,0.5,1)}
 dens.beta1510 <- function(tau) {dbeta(tau,1.5,1)}
-dens.beta1015 <- function(tau) {dbeta(tau,1,1.5)}
-dens.beta1090 <- function(tau) {dbeta(tau,1,9)}
-dens.beta9010 <- function(tau) {dbeta(tau,9,1)}
-dens.beta0611 <- function(tau) {dbeta(tau,0.6,1.1)}
-dens.beta0914 <- function(tau) {dbeta(tau,0.9,1.4)}
 
 tau.grid <- function(g=1000, tau.max=1, rep=g) {
-  v0 <- 1/(2*g)
-  v1 <- 1-v0
+  v0 <- 0
+  v1 <- 1
   tau.val <- tau.max*seq(v0, v1, length=g)
   return(rep(tau.val, each=rep))
 }
-tau.grid(10)
-tau.grid(100,tau.max=2,rep=1)
 
 pi.grid <- function(g=1000,rep=g) {
-  v0 <- 1/(2*g)
-  v1 <- 1-v0
+  v0 <- 0
+  v1 <- 1
   pi.val <- seq(v0, v1, length=g)
   return(rep(pi.val, times=rep))
 }
-pi.grid(10)
-pi.grid(100,1)
 
 prior.surface <- function(pi, tau, hp=dens.uniform, alpha=4, beta=16, delta=0) {
   dbeta(pi, delta+(alpha-delta)*tau, delta+(beta-delta)*tau)*hp(tau)
 }
 
 persp.prior <- function(hp=dens.uniform, alpha=4, beta=16,
-                        g=100, xmax=1, delta=0) {
+                        g=40, xmax=1, delta=0, zmax=4.7) {
   library("plot3D")
   tau <- tau.grid(g, xmax)
   pi <- pi.grid(g)
   d <- matrix(prior.surface(pi, tau, hp, alpha, beta, delta), nrow=g, byrow=TRUE)
   truncate.d <- d
-  truncate.d[d>13.3] <- 13.3
+  truncate.d[d>zmax] <- zmax
   persp3D(x=tau.grid(g,xmax,rep=1),
         y=pi.grid(g,rep=1),
         z=truncate.d,
-        theta=40, phi=20,
+        theta=60, phi=40,
         xlab="tau", ylab="pi",
-        zlab="Density",zlim=c(0,13.3),
-        colvar=FALSE,
+        colvar=NULL, col="white",
+        zlab="Density",zlim=c(0, zmax),
         border="black")
-  text3D(x=-0.12,y=-0.12,z=0,labels="pi=0\ntau=0",add=TRUE)
-  text3D(x= 1.04,y= 0.04,z=0,labels="pi=0\ntau=1",add=TRUE)
+  text3D(x=-0.12,y=-0.22,z=0,labels="pi=0\ntau=0",add=TRUE)
+  text3D(x= 0.91,y=-0.17,z=0,labels="pi=0\ntau=1",add=TRUE)
   text3D(x= 1.02,y= 1.02,z=0,labels="pi=1\ntau=1",add=TRUE)
+  text3D(x=-0.02,y= 1.12,z=0,labels="pi=1\ntau=0",add=TRUE)
   return(d)
 }
-tst<- persp.prior()
+
+persp.slice.tau <- function(hp=dens.uniform, alpha=4, beta=16,
+                        g=40, xmax=1, delta=0, zmax=4.7) {
+  library("plot3D")
+  tau <- tau.grid(g, xmax)
+  pi <- pi.grid(g)
+  d <- matrix(prior.surface(pi, tau, hp, alpha, beta, delta), nrow=g, byrow=TRUE)
+  truncate.d <- d
+  truncate.d[d>zmax] <- zmax
+  truncate.d[pi>0] <- NA
+  persp3D(x=tau.grid(g,xmax,rep=1),
+        y=pi.grid(g,rep=1),
+        z=truncate.d,
+        theta=60, phi=40,
+        xlab="tau", ylab="pi",
+        colvar=NULL, col="white",
+        zlab="Density",zlim=c(0, zmax),
+        border="black")
+  segments3D(x0=rep(1,g-1), y0=pi[1:(g-1)], z0=dbeta(pi[1:(g-1)], alpha, beta),
+             x1=rep(1,g-1), y1=pi[2:g],     z1=dbeta(pi[2:g],     alpha, beta),
+             col="black", lwd=3, add=TRUE)
+  alpha0 <- 1+0.75*(alpha-1)
+  beta0  <- 1+0.75*(beta-1)
+  segments3D(x0=rep(0.75,g-1), y0=pi[1:(g-1)], z0=dbeta(pi[1:(g-1)], alpha0, beta0),
+             x1=rep(0.75,g-1), y1=pi[2:g],     z1=dbeta(pi[2:g],     alpha0, beta0),
+             col="black", lwd=3, add=TRUE)
+  alpha0 <- 1+0.5*(alpha-1)
+  beta0  <- 1+0.5*(beta-1)
+  segments3D(x0=rep(0.5,g-1), y0=pi[1:(g-1)], z0=dbeta(pi[1:(g-1)], alpha0, beta0),
+             x1=rep(0.5,g-1), y1=pi[2:g],     z1=dbeta(pi[2:g],     alpha0, beta0),
+             col="black", lwd=3, add=TRUE)
+  alpha0 <- 1+0.25*(alpha-1)
+  beta0  <- 1+0.25*(beta-1)
+  segments3D(x0=rep(0.25,g-1), y0=pi[1:(g-1)], z0=dbeta(pi[1:(g-1)], alpha0, beta0),
+             x1=rep(0.25,g-1), y1=pi[2:g],     z1=dbeta(pi[2:g],     alpha0, beta0),
+             col="black", lwd=3, add=TRUE)
+  segments3D(x0=rep(0,g-1), y0=pi[1:(g-1)], z0=rep(1, g-1),
+             x1=rep(0,g-1), y1=pi[2:g],     z1=rep(1, g-1),
+             col="black", lwd=3, add=TRUE)
+  text3D(y= 1.02,x= 1.02,z=0,labels="tau=1",add=TRUE)
+  text3D(y= 1.02,x= 0.77,z=0,labels="tau=0.75",add=TRUE)
+  text3D(y= 1.02,x= 0.52,z=0,labels="tau=0.5",add=TRUE)
+  text3D(y= 1.02,x= 0.27,z=0,labels="tau=0.25",add=TRUE)
+  text3D(y= 1.02,x= 0.02,z=1,labels="tau=0",add=TRUE)
+  return(d)
+}
+
+persp.slice.pi <- function(hp=dens.uniform, alpha=4, beta=16,
+                        g=40, xmax=1, delta=0, zmax=4.7) {
+  library("plot3D")
+  tau <- tau.grid(g, xmax)
+  pi <- pi.grid(g)
+  d <- matrix(prior.surface(pi, tau, hp, alpha, beta, delta), nrow=g, byrow=TRUE)
+  truncate.d <- d
+  truncate.d[d>zmax] <- zmax
+  truncate.d[tau< 1] <- NA
+  persp3D(x=tau.grid(g,xmax,rep=1),
+        y=pi.grid(g,rep=1),
+        z=truncate.d,
+        theta=60, phi=40,
+        xlab="tau", ylab="pi",
+        colvar=NULL, col="white",
+        zlab="Density",zlim=c(0, zmax),
+        border="black")
+  a0 <- 1+pi[1:g]*(alpha-1)
+  b0  <- 1+pi[1:g]*(beta-1)
+  for (i in (0:20)/20) {
+    segments3D(y0=rep(i,g-1), x0=pi[1:(g-1)], z0=dbeta(i, a0[1:(g-1)], b0[1:(g-1)]),
+               y1=rep(i,g-1), x1=pi[2:g],     z1=dbeta(i, a0[2:g],     b0[2:g]),
+               col="black", lwd=3, add=TRUE)
+    text3D(x= 1.12,y= i,z=0,labels=paste0("pi=", i),add=TRUE, srt=-60)
+  }
+  segments3D(x0=rep(1,g-1), y0=pi[1:(g-1)], z0=dbeta(pi[1:(g-1)], alpha, beta),
+             x1=rep(1,g-1), y1=pi[2:g],     z1=dbeta(pi[2:g],     alpha, beta),
+             col="black", lwd=3, add=TRUE)
+  segments3D(x0=rep(0,g-1), y0=pi[1:(g-1)], z0=rep(1, g-1),
+             x1=rep(0,g-1), y1=pi[2:g],     z1=rep(1, g-1),
+             col="black", lwd=3, add=TRUE)
+  return(d)
+}
+
 
 p.slice <- function(tau, alpha=4, beta=16, ymax=6.5, hp=dens.uniform, delta=0) {
   p <- pi.grid(rep=1)
@@ -118,64 +190,10 @@ persp.posterior <- function(hp=dens.uniform, alpha=4, beta=16, x=54, n=60,
         xlab="tau", ylab="pi", zlab="Density")
   return(s3)
 }
+```
 
-# obsolete: ag <- function(n) {seq(1/(2*n), 1-1/(2*n), length=n)}
-
-png(file="bb01.png",width=900,height=300)
-layout(matrix(1:12,nrow=2,byrow=TRUE),
-       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
-par(mar=c(2.1,2.1,0.6,0.6))
-x <- (1:999)/1000
-ct("dbeta(x,4,16)",90)
-pl2(dbeta(x,4,16))
-frame()
-frame()
-frame()
-frame()
-par(mar=c(0.1,2.1,0.1,0.6))
-frame()
-ct("Prior")
-dev.off()
-
-png(file="bb02.png",width=900,height=300)
-layout(matrix(1:12,nrow=2,byrow=TRUE),
-       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
-par(mar=c(2.1,2.1,0.6,0.6))
-x <- (1:999)/1000
-frame()
-frame()
-ct("dbinom(18,60,x)",90)
-pl2(dbinom(18,60,x))
-frame()
-frame()
-par(mar=c(0.1,2.1,0.1,0.6))
-frame()
-frame()
-frame()
-ct("Likelihood")
-dev.off()
-
-png(file="bb03.png",width=900,height=300)
-layout(matrix(1:12,nrow=2,byrow=TRUE),
-       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
-par(mar=c(2.1,2.1,0.6,0.6))
-x <- (1:999)/1000
-frame()
-frame()
-frame()
-frame()
-ct("dbeta(x,22,58)",90)
-pl2(dbeta(x,22,58))
-par(mar=c(0.1,2.1,0.1,0.6))
-frame()
-frame()
-frame()
-frame()
-frame()
-ct("Posterior")
-dev.off()
-
-png(file="bb04.png",width=900,height=300)
+```{r draw-fig1}
+png(file="plots/fig1.png",width=900,height=300)
 layout(matrix(1:12,nrow=2,byrow=TRUE),
        widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
 par(mar=c(2.1,2.1,0.6,0.6))
@@ -194,28 +212,10 @@ ct("Likelihood")
 ct(expression(phantom(0) %prop% phantom(0)))
 ct("Posterior")
 dev.off()
+```
 
-png(file="bb05.png",width=900,height=300)
-layout(matrix(1:12,nrow=2,byrow=TRUE),
-       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
-par(mar=c(2.1,2.1,0.6,0.6))
-x <- (4*(1:25)-2)/100
-ct("dbeta(x,4,16)",90)
-plb(dbeta(x,4,16))
-ct("dbinom(18,60,x)",90)
-plb(dbinom(18,60,x))
-ct("dbeta(x,22,58)",90)
-plb(dbeta(x,22,58))
-par(mar=c(0.1,2.1,0.1,0.6))
-frame()
-ct("Prior")
-ct("X")
-ct("Likelihood")
-ct(expression(phantom(0) %prop% phantom(0)))
-ct("Posterior")
-dev.off()
-
-png(file="bb06.png",width=900,height=300)
+```{r draw-fig2}
+png(file="plots/fig2.png",width=900,height=300)
 layout(matrix(1:12,nrow=2,byrow=TRUE),
        widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
 par(mar=c(2.1,2.1,0.6,0.6))
@@ -234,21 +234,91 @@ ct("Likelihood")
 ct(expression(phantom(0) %prop% phantom(0)))
 ct("Posterior")
 dev.off()
+```
 
+```{r calculate-bb-nice}
+# posterior mean with x=18, n=60
+(18+4)/(18+4+42+16)
+# posterior 95% credibility interval
+qbeta(c(0.025, 0.975), 18+4, 42+16)
+# posterior mean with x=18, n=60, but flat prior
+(18+1)/(18+1+42+ 1)
+# posterior 95% credibility interval with flat prior
+qbeta(c(0.025, 0.975), 18+1, 42+ 1)
+```
+
+```{r calculate-bb-nasty}
+# posterior mean with x=54, n=60
+(54+6)/(54+4+6+16)
+# posterior 95% credibility interval
+qbeta(c(0.025, 0.975), 54+4, 6+16)
+# posterior standard deviation
+sqrt((54+4)*(6+16)/((54+4+6+16)^2*(54+4+6+16)))
+# posterior mean with x=54, n=60, but flat prior
+(54+1)/ (54+1+6+1)
+# posterior 95% credibility interval with flat prior
+qbeta(c(0.025, 0.975), 54+1, 6+1)
+# posterior standard deviation
+sqrt((54+1)*(6+1)/((54+1+6+1)^2*(54+1+6+1)))
+```
+
+```{r draw-table-bb-nice}
 library("rjags")
 dat.bb <- list(a=4,b=16,x=18,n=60)
 mod.bb <- jags.model("jbb.txt",dat.bb)
 update(mod.bb,1000)
-out.bb <- coda.samples(mod.bb, "p", 1000)
+out.bb <- coda.samples(mod.bb, "pi", 1000)
 summary(out.bb)
+```
 
+```{r draw-table-bb-nasty}
 dat.bb <- list(a=4,b=16,x=54,n=60)
 mod.bb <- jags.model("jbb.txt",dat.bb)
 update(mod.bb,1000)
-out.bb <- coda.samples(mod.bb, "p", 1000)
+out.bb <- coda.samples(mod.bb, "pi", 1000)
 summary(out.bb)
+```
 
-png(file="bb07.png",width=900,height=450)
+```{r draw-table-hedge-nasty}
+dat.hedge.nasty <- list(a=4,b=16,x=54,n=60)
+mod.hedge.nasty <- jags.model("jhedge.txt",dat.hedge.nasty)
+update(mod.hedge.nasty,1000)
+out.hedge.nasty <- coda.samples(mod.hedge.nasty, c("pi", "tau", "post.n"), 1000)
+summary(out.hedge.nasty)
+```
+
+```{r draw-table-hedge-nice}
+dat.hedge.nice <- list(a=4,b=16,x=18,n=60)
+mod.hedge.nice <- jags.model("jhedge.txt",dat.hedge.nice)
+update(mod.hedge.nice,1000)
+out.hedge.nice <- coda.samples(mod.hedge.nice, c("pi", "tau", "post.n"), 1000)
+summary(out.hedge.nice)
+```
+
+
+```{r draw-hedging-surface}
+png(file="plots/fig3.png",width=450,height=450)
+par(mar=rep(0.6,4))
+surf1 <- persp.prior(delta=1)
+dev.off()
+```
+
+```{r draw-tau-slices}
+png(file="plots/fig4.png",width=450,height=450)
+par(mar=rep(0.6,4))
+surf1 <- persp.slice.tau(delta=1)
+dev.off()
+```
+
+```{r draw-pi-slices}
+png(file="plots/fig5.png",width=450,height=450)
+par(mar=rep(0.6,4))
+surf1 <- persp.slice.pi(delta=1)
+dev.off()
+```
+
+```{r leftovers, eval=FALSE}
+png(file="plots/bb07.png",width=900,height=450)
 harmonic.mean <- function(x) {1/mean(1/x)}
 dat.ubb.bad <- list(a=4,b=16,x=54,n=60)
 mod.ubb.bad <- jags.model("jubb.txt",dat.ubb.bad)
@@ -259,7 +329,7 @@ plot(out.ubb.bad)
 harmonic.mean(unlist(out.ubb.bad[,"post.n"]))
 dev.off()
 
-png(file="bb08.png",width=900,height=450)
+png(file="plots/bb08.png",width=900,height=450)
 dat.ubb.good <- list(a=4,b=16,x=18,n=60)
 mod.ubb.good <- jags.model("jubb.txt",dat.ubb.good)
 update(mod.ubb.good,1000)
@@ -269,12 +339,8 @@ plot(out.ubb.good)
 harmonic.mean(unlist(out.ubb.good[,"post.n"]))
 dev.off()
 
-png(file="bb09.png",width=450,height=450)
-par(mar=rep(0.6,4))
-surf1 <- persp.prior()
-dev.off()
 
-png(file="bb10.png",width=600,height=450)
+png(file="plots/bb10.png",width=600,height=450)
 layout(matrix(c(rep(1,25),2:6),nrow=5,byrow=FALSE))
 par(mar=rep(0.6,4))
 surf1 <- persp.prior()
@@ -295,7 +361,7 @@ text(0.5,5.5,"Tau = 0.2",cex=2)
 box()
 dev.off()
 
-png(file="bb11.png",width=600,height=450)
+png(file="plots/bb11.png",width=600,height=450)
 layout(matrix(c(rep(1,25),2:6),nrow=5,byrow=FALSE))
 par(mar=rep(0.6,4))
 surf1 <- persp.prior()
@@ -307,7 +373,7 @@ r5 <- tau.slice(0.9)
 dev.off()
 
 
-png(file="bb12.png",width=900,height=300)
+png(file="plots/bb12.png",width=900,height=300)
 layout(matrix(1:4,nrow=2,byrow=TRUE),
        widths=c(0.5,0.5),heights=c(9,1)/10)
 par(mar=rep(0.6,4))
@@ -317,7 +383,7 @@ ct("Likelihood for x=18, n=60")
 ct("Likelihood for x=54, n=60")
 dev.off()
 
-png(file="bb13.png",width=900,height=300)
+png(file="plots/bb13.png",width=900,height=300)
 layout(matrix(1:12,nrow=2,byrow=TRUE),
        widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
 par(mar=rep(0.6,4))
@@ -335,7 +401,7 @@ ct(expression(phantom(0) %prop% phantom(0)))
 ct("Posterior")
 dev.off()
 
-png(file="bb14.png",width=900,height=300)
+png(file="plots/bb14.png",width=900,height=300)
 layout(matrix(1:12,nrow=2,byrow=TRUE),
        widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
 par(mar=rep(0.6,4))
@@ -369,29 +435,32 @@ etau <- function(surf,scale=FALSE) {
   return(list(x=tg,y=am))
 }
 
-png(file="bb15.png",width=600,height=300)
+png(file="plots/bb15.png",width=600,height=300)
 ref0 <- etau(surf1)
 box()
 dev.off()
 
-png(file="bb16.png",width=600,height=300)
+png(file="plots/bb16.png",width=600,height=300)
 ref1 <- etau(surf1,scale=TRUE)
 box()
 dev.off()
 
-png(file="bb17.png",width=450,height=450)
+png(file="plots/bb17.png",width=450,height=450)
 par(mar=rep(0.6,4))
 surf2 <- persp.prior(hp=dens.beta0510)
 dev.off()
 
-png(file="bb18.png",width=600,height=300)
+png(file="plots/bb18.png",width=600,height=300)
 etau(surf2,scale=TRUE)
 lines(ref1,lty="dashed")
 dev.off()
 
-png(file="bb19.png",width=450,height=450)
+png(file="plots/bb19.png",width=450,height=450)
 par(mar=rep(0.6,4))
 surf3 <- persp.prior(delta=1)
 dev.off()
 ```
 
+```{r save-everything}
+save.image(file="hedge-plots.RData")
+```
