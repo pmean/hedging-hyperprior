@@ -1,0 +1,72 @@
+---
+title: "Hedging-hyperprior-text-output"
+author: "Steve Simon"
+date: "June 19, 2017"
+output: html_document
+---
+
+
+```{r initial-steps}
+source("prelims.R")
+```
+
+```{r calculate-exact-bb-results}
+# posterior distribution with x=18, n=60
+a0 <-  4
+b0 <- 16
+x  <- 18
+n  <- 60
+a1 <- a0 + x
+b1 <- b0 + (n-x)
+# posterior mean
+a1/(a1+b1)
+# posterior 95% credibility interval
+qbeta(c(0.025, 0.975), a1, b1)
+
+# posterior mean with x=54, n=60
+x  <- 54
+n  <- 60
+a2 <- a0 + x
+b2 <- b0 + (n-x)
+# posterior mean
+a2/(a2+b2)
+# posterior 95% credibility interval
+qbeta(c(0.025, 0.975), a2, b2)
+```
+
+```{r draw-table-bb-nice}
+library("rjags")
+dat.bb <- list(a=4, b=16, x=18, n=60)
+mod.bb <- jags.model("jbb.txt", dat.bb, quiet=TRUE)
+update(mod.bb, 1000)
+out.bb <- coda.samples(mod.bb, "pi", 1000)
+summary(out.bb)
+```
+
+```{r draw-table-bb-nasty}
+dat.bb <- list(a=4, b=16, x=54, n=60)
+mod.bb <- jags.model("jbb.txt", dat.bb, quiet=TRUE)
+update(mod.bb, 1000)
+out.bb <- coda.samples(mod.bb, "pi", 1000)
+summary(out.bb)
+```
+
+```{r draw-table-hedge-nasty}
+dat.hedge.nasty <- list(a=4, b=16, x=54, n=60)
+mod.hedge.nasty <- jags.model("jhedge.txt", dat.hedge.nasty, quiet=TRUE)
+update(mod.hedge.nasty, 1000)
+out.hedge.nasty <- coda.samples(mod.hedge.nasty, c("pi", "tau", "post.n"), 1000)
+summary(out.hedge.nasty)
+```
+
+```{r draw-table-hedge-nice}
+dat.hedge.nice <- list(a=4, b=16, x=18, n=60)
+mod.hedge.nice <- jags.model("jhedge.txt", dat.hedge.nice, quiet=TRUE)
+update(mod.hedge.nice, 1000)
+out.hedge.nice <- coda.samples(mod.hedge.nice, c("pi", "tau", "post.n"), 1000)
+summary(out.hedge.nice)
+```
+
+```{r save-everything}
+save.image(file="hedge-output.RData")
+```
