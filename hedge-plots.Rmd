@@ -5,7 +5,76 @@ date: "June 19, 2017"
 output: html_document
 ---
 
+Three dimensional plots are tricky. According to the Wikipedia entry on azimuth, "In mathematics, the azimuth angle of a point in cylindrical coordinates or spherical coordinates is the anticlockwise angle between the positive x-axis and the projection of the vector onto the xy-plane." The value of theta is defined as the azimuthal angle according to the help file of persp3D. So, assuming a colatitude (phi) of 0, the default of value of 0 for theta means that you are staring straight down the X-axis, and the value of 90 means that you are staring straight down the Y-axis.
+
+
 ```{r initial-steps}
+library(plot3D)
+library(rjags)
+
+cycle_fast <- function(g=1001, cmax=1, rep=g) {
+  cyc <- seq(0, cmax, length=g)
+  return(rep(cyc, times=rep))
+}
+
+cycle_slow <- function(g=1001, cmax=1, rep=g) {
+  cyc <- seq(0, cmax, length=g)
+  return(rep(cyc, each=rep))
+}
+cycle_fast(3)
+cycle_slow(3)
+
+matrix(cycle_fast(3), nrow=3, byrow=TRUE)
+
+calculate_prior <- function(pi, tau, g=21, alpha=4, beta=16, d=1, hp=dens.uniform) {
+  v <- dbeta(pi, d+(alpha-d)*tau, d+(beta-d)*tau)*hp(tau)
+  # with byrow=TRUE, cycle_slow is the rows (x) and cycle_fast is the columns (y)
+  matrix(v, nrow=g, byrow=TRUE)
+}
+
+draw_prior <- function(hp=dens.uniform, g=33, alpha=4, beta=16,
+                       tau_max=1, d=1, zmax=4.7) {
+  tau <- cycle_slow(g, tau_max)
+  pi  <- cycle_fast(g)
+  d <- calculate_prior(pi, tau, g, alpha, beta, d, hp)
+  persp3D(z=d, xlab="tau", ylab="pi",zlab="Density", zlim=c(0, zmax),
+    theta=th, phi=ph, colvar=NULL, col="white", border="black",
+    bty="u", col.axis="gray90")
+  return(d)
+}
+
+tau_slice <- function(tau_cut, hp=dens.uniform, g=33, alpha=4, beta=16,
+                      tau_max=1, d=1, zmax=4.7) {
+  delta <- 1E-2
+  tau <- cycle_slow(g, tau_max)
+  pi  <- cycle_fast(g)
+  d <- calculate_prior(pi, tau, g, alpha, beta, d, hp)
+  d[tau < tau_cut-delta] <- NA
+  persp3D(z=d, xlab="tau", ylab="pi",zlab="Density", zlim=c(0, zmax),
+    theta=th, phi=ph, colvar=NULL, col="white", border="gray90", 
+    bty="u", col.axis="gray90")
+  d[tau > tau_cut+delta] <- NA
+  persp3D(z=d, xlab="tau", ylab="pi",zlab="Density", zlim=c(0, zmax),
+    theta=th, phi=ph, colvar=NULL, col="white", border="black", add=TRUE)
+  return(d)
+}
+
+pi_slice <- function(pi_cut, hp=dens.uniform, g=33, alpha=4, beta=16,
+                      tau_max=1, d=1, zmax=4.7) {
+  delta <- 1E-2
+  tau <- cycle_slow(g, tau_max)
+  pi  <- cycle_fast(g)
+  d <- calculate_prior(pi, tau, g, alpha, beta, d, hp)
+  d[pi > pi_cut+delta] <- NA
+  persp3D(z=d, xlab="tau", ylab="pi",zlab="Density", zlim=c(0, zmax),
+    theta=th, phi=ph, colvar=NULL, col="white", border="gray90",
+    bty="u", col.axis="gray90")
+  d[pi < pi_cut-delta] <- NA
+  persp3D(z=d, xlab="tau", ylab="pi",zlab="Density", zlim=c(0, zmax),
+    theta=th, phi=ph, colvar=NULL, col="white", border="black", add=TRUE)
+  return(d)
+}
+
 ct <- function(la,sr=0) {
   plot(0:1,0:1,type="n",axes=FALSE,xlab=" ",ylab=" ")
   text(0.5,0.5,la,srt=sr,cex=2)
@@ -16,179 +85,23 @@ pl2 <- function(y) {
   axis(side=1,at=(0:10)/10,cex=2)
 }
 
-plb <- function(y) {
-  barplot(y,axes=FALSE,xlab=" ",ylab=" ",space=0,col="white")
-  axis(side=1,at=(0:10)*2.5,labels=(0:10)/10,cex=2)
-}
-
 dens.uniform <- function(tau) {dunif(tau,0.00,1.00)}
 dens.beta0510 <- function(tau) {dbeta(tau,0.5,1)}
 dens.beta1510 <- function(tau) {dbeta(tau,1.5,1)}
 
-tau.grid <- function(g=1000, tau.max=1, rep=g) {
-  v0 <- 0
-  v1 <- 1
-  tau.val <- tau.max*seq(v0, v1, length=g)
-  return(rep(tau.val, each=rep))
+calc_likelihood <- function(pi, x=54, n=60, g=33) {
+  v <- dbinom(x, n, pi)
+  matrix(v, nrow=g, byrow=TRUE)
 }
 
-pi.grid <- function(g=1000,rep=g) {
-  v0 <- 0
-  v1 <- 1
-  pi.val <- seq(v0, v1, length=g)
-  return(rep(pi.val, times=rep))
-}
-
-prior.surface <- function(pi, tau, hp=dens.uniform, alpha=4, beta=16, delta=0) {
-  dbeta(pi, delta+(alpha-delta)*tau, delta+(beta-delta)*tau)*hp(tau)
-}
-
-persp.prior <- function(hp=dens.uniform, alpha=4, beta=16,
-                        g=40, xmax=1, delta=0, zmax=4.7) {
-  library("plot3D")
-  tau <- tau.grid(g, xmax)
-  pi <- pi.grid(g)
-  d <- matrix(prior.surface(pi, tau, hp, alpha, beta, delta), nrow=g, byrow=TRUE)
-  truncate.d <- d
-  truncate.d[d>zmax] <- zmax
-  persp3D(x=tau.grid(g,xmax,rep=1),
-        y=pi.grid(g,rep=1),
-        z=truncate.d,
-        theta=60, phi=40,
-        xlab="tau", ylab="pi",
-        colvar=NULL, col="white",
-        zlab="Density",zlim=c(0, zmax),
-        border="black")
-  text3D(x=-0.12,y=-0.22,z=0,labels="pi=0\ntau=0",add=TRUE)
-  text3D(x= 0.91,y=-0.17,z=0,labels="pi=0\ntau=1",add=TRUE)
-  text3D(x= 1.02,y= 1.02,z=0,labels="pi=1\ntau=1",add=TRUE)
-  text3D(x=-0.02,y= 1.12,z=0,labels="pi=1\ntau=0",add=TRUE)
+draw_likelihood <- function(x=54, n=60,
+                             g=33, xmax=1) {
+  pi <- cycle_fast(g)
+  d <- calc_likelihood(pi, x, n, g)
+  persp(z=d, theta=th, phi=ph,
+        xlab="tau", ylab="pi", zlab="Likelihood",
+        zlim=c(0, max(d)))
   return(d)
-}
-
-persp.slice.tau <- function(hp=dens.uniform, alpha=4, beta=16,
-                        g=40, xmax=1, delta=0, zmax=4.7) {
-  library("plot3D")
-  tau <- tau.grid(g, xmax)
-  pi <- pi.grid(g)
-  d <- matrix(prior.surface(pi, tau, hp, alpha, beta, delta), nrow=g, byrow=TRUE)
-  truncate.d <- d
-  truncate.d[d>zmax] <- zmax
-  truncate.d[pi>0] <- NA
-  persp3D(x=tau.grid(g,xmax,rep=1),
-        y=pi.grid(g,rep=1),
-        z=truncate.d,
-        theta=60, phi=40,
-        xlab="tau", ylab="pi",
-        colvar=NULL, col="white",
-        zlab="Density",zlim=c(0, zmax),
-        border="black")
-  segments3D(x0=rep(1,g-1), y0=pi[1:(g-1)], z0=dbeta(pi[1:(g-1)], alpha, beta),
-             x1=rep(1,g-1), y1=pi[2:g],     z1=dbeta(pi[2:g],     alpha, beta),
-             col="black", lwd=3, add=TRUE)
-  alpha0 <- 1+0.75*(alpha-1)
-  beta0  <- 1+0.75*(beta-1)
-  segments3D(x0=rep(0.75,g-1), y0=pi[1:(g-1)], z0=dbeta(pi[1:(g-1)], alpha0, beta0),
-             x1=rep(0.75,g-1), y1=pi[2:g],     z1=dbeta(pi[2:g],     alpha0, beta0),
-             col="black", lwd=3, add=TRUE)
-  alpha0 <- 1+0.5*(alpha-1)
-  beta0  <- 1+0.5*(beta-1)
-  segments3D(x0=rep(0.5,g-1), y0=pi[1:(g-1)], z0=dbeta(pi[1:(g-1)], alpha0, beta0),
-             x1=rep(0.5,g-1), y1=pi[2:g],     z1=dbeta(pi[2:g],     alpha0, beta0),
-             col="black", lwd=3, add=TRUE)
-  alpha0 <- 1+0.25*(alpha-1)
-  beta0  <- 1+0.25*(beta-1)
-  segments3D(x0=rep(0.25,g-1), y0=pi[1:(g-1)], z0=dbeta(pi[1:(g-1)], alpha0, beta0),
-             x1=rep(0.25,g-1), y1=pi[2:g],     z1=dbeta(pi[2:g],     alpha0, beta0),
-             col="black", lwd=3, add=TRUE)
-  segments3D(x0=rep(0,g-1), y0=pi[1:(g-1)], z0=rep(1, g-1),
-             x1=rep(0,g-1), y1=pi[2:g],     z1=rep(1, g-1),
-             col="black", lwd=3, add=TRUE)
-  text3D(y= 1.02,x= 1.02,z=0,labels="tau=1",add=TRUE)
-  text3D(y= 1.02,x= 0.77,z=0,labels="tau=0.75",add=TRUE)
-  text3D(y= 1.02,x= 0.52,z=0,labels="tau=0.5",add=TRUE)
-  text3D(y= 1.02,x= 0.27,z=0,labels="tau=0.25",add=TRUE)
-  text3D(y= 1.02,x= 0.02,z=1,labels="tau=0",add=TRUE)
-  return(d)
-}
-
-persp.slice.pi <- function(hp=dens.uniform, alpha=4, beta=16,
-                        g=40, xmax=1, delta=0, zmax=4.7) {
-  library("plot3D")
-  tau <- tau.grid(g, xmax)
-  pi <- pi.grid(g)
-  d <- matrix(prior.surface(pi, tau, hp, alpha, beta, delta), nrow=g, byrow=TRUE)
-  truncate.d <- d
-  truncate.d[d>zmax] <- zmax
-  truncate.d[tau< 1] <- NA
-  persp3D(x=tau.grid(g,xmax,rep=1),
-        y=pi.grid(g,rep=1),
-        z=truncate.d,
-        theta=60, phi=40,
-        xlab="tau", ylab="pi",
-        colvar=NULL, col="white",
-        zlab="Density",zlim=c(0, zmax),
-        border="black")
-  a0 <- 1+pi[1:g]*(alpha-1)
-  b0  <- 1+pi[1:g]*(beta-1)
-  for (i in (0:20)/20) {
-    segments3D(y0=rep(i,g-1), x0=pi[1:(g-1)], z0=dbeta(i, a0[1:(g-1)], b0[1:(g-1)]),
-               y1=rep(i,g-1), x1=pi[2:g],     z1=dbeta(i, a0[2:g],     b0[2:g]),
-               col="black", lwd=3, add=TRUE)
-    text3D(x= 1.12,y= i,z=0,labels=paste0("pi=", i),add=TRUE, srt=-60)
-  }
-  segments3D(x0=rep(1,g-1), y0=pi[1:(g-1)], z0=dbeta(pi[1:(g-1)], alpha, beta),
-             x1=rep(1,g-1), y1=pi[2:g],     z1=dbeta(pi[2:g],     alpha, beta),
-             col="black", lwd=3, add=TRUE)
-  segments3D(x0=rep(0,g-1), y0=pi[1:(g-1)], z0=rep(1, g-1),
-             x1=rep(0,g-1), y1=pi[2:g],     z1=rep(1, g-1),
-             col="black", lwd=3, add=TRUE)
-  return(d)
-}
-
-
-p.slice <- function(tau, alpha=4, beta=16, ymax=6.5, hp=dens.uniform, delta=0) {
-  p <- pi.grid(rep=1)
-  d <- prior.surface(p, tau, hp=hp, delta=delta)
-  ymax <- max(ymax,d,na.rm=TRUE)
-  plot(p, d, ylim=c(0,ymax), type="l", xlab="p", ylab="density",axes=FALSE)
-  return(d)
-}
-
-tau.slice <- function(p, alpha=4, beta=16, ymax=0, prior.tau=dens.uniform, delta=0) {
-  tau <- tau.grid(rep=1)
-  d <- prior.surface(p, tau, hp=prior.tau, delta=delta)
-  ymax=max(ymax,d,na.rm=TRUE)
-  plot(tau, d, ylim=c(0,1.2*ymax), type="l", xlab="tau", ylab="density",axes=FALSE)
-  axis(side=2,at=c(0,max(pretty(d))))
-  box()
-  text(0.5,1.1*ymax,paste("pi =",p))
-  return(d)
-}
-
-likelihood.curve <- function(pi, x=54, n=60) {
-  dbinom(x, n, pi)
-}
-
-persp.likelihood <- function(x=54, n=60,
-                             g=100, xmax=1) {
-  pi <- pi.grid(g)
-  d <- matrix(likelihood.curve(pi, x, n), nrow=g, byrow=TRUE)
-  persp(z=d, theta=40, phi=20,
-        xlab="tau", ylab="pi", zlab="Likelihood")
-  return(d)
-}
-
-persp.posterior <- function(hp=dens.uniform, alpha=4, beta=16, x=54, n=60,
-                            g=100, xmax=1) {
-  tau <- tau.grid(g, xmax)
-  pi <- pi.grid(g)
-  s1 <- prior.surface(pi, tau, hp, alpha, beta)
-  s2 <- likelihood.curve(pi, x, n)
-  s3 <- matrix(s1*s2, nrow=g, byrow=TRUE)
-  persp(z=s3, theta=40, phi=20,
-        xlab="tau", ylab="pi", zlab="Density")
-  return(s3)
 }
 ```
 
@@ -298,127 +211,87 @@ summary(out.hedge.nice)
 
 ```{r draw-hedging-surface}
 png(file="plots/fig3.png",width=450,height=450)
+th=40; ph=10
 par(mar=rep(0.6,4))
-surf1 <- persp.prior(delta=1)
+surf1 <- draw_prior()
 dev.off()
 ```
 
 ```{r draw-tau-slices}
-png(file="plots/fig4.png",width=450,height=450)
-par(mar=rep(0.6,4))
-surf1 <- persp.slice.tau(delta=1)
+png(file="plots/fig5.png",width=450,height=450)
+par(mar=rep(0.6,4), mfrow=c(3,3))
+for (i in 0:8) {
+  surf1 <- tau_slice(i/8)
+}
 dev.off()
 ```
 
 ```{r draw-pi-slices}
-png(file="plots/fig5.png",width=450,height=450)
+png(file="plots/fig4.png",width=450,height=450)
+par(mar=rep(0.6,4), mfrow=c(3,3))
+for (i in 8:0) {
+  surf1 <- pi_slice(i/8)
+}
+dev.off()
+```
+
+```{r draw-posterior-nasty}
+x     <- 54
+n     <- 60
+g     <- 33
+alpha <-  4
+beta  <- 16
+hp <- dens.uniform
+png(file="plots/fig6.png",width=900,height=300)
 par(mar=rep(0.6,4))
-surf1 <- persp.slice.pi(delta=1)
+layout(matrix(1:12,nrow=2,byrow=TRUE),
+       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
+frame()
+s1 <- draw_prior(hp, g, alpha, beta)
+frame()
+s2 <- draw_likelihood(x, n, g)
+frame()
+s3 <- s1*s2
+persp(z=s3, theta=th, phi=ph,
+  xlab="tau", ylab="pi", zlab="Density")
+frame()
+ct("Prior")
+ct("X")
+ct("Likelihood")
+ct(expression(phantom(0) %prop% phantom(0)))
+ct("Posterior")
+dev.off()
+```
+
+```{r draw-posterior-nice}
+x     <- 18
+n     <- 60
+g     <- 33
+alpha <-  4
+beta  <- 16
+hp <- dens.uniform
+png(file="plots/fig7.png",width=900,height=300)
+layout(matrix(1:12,nrow=2,byrow=TRUE),
+       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
+par(mar=rep(0.6,4))
+frame()
+s1 <- draw_prior(hp, g, alpha, beta)
+frame()
+s2 <- draw_likelihood(x, n, g)
+frame()
+s3 <- s1*s2
+persp(z=s3, theta=th, phi=ph,
+  xlab="tau", ylab="pi", zlab="Density")
+frame()
+ct("Prior")
+ct("X")
+ct("Likelihood")
+ct(expression(phantom(0) %prop% phantom(0)))
+ct("Posterior")
 dev.off()
 ```
 
 ```{r leftovers, eval=FALSE}
-png(file="plots/bb07.png",width=900,height=450)
-harmonic.mean <- function(x) {1/mean(1/x)}
-dat.ubb.bad <- list(a=4,b=16,x=54,n=60)
-mod.ubb.bad <- jags.model("jubb.txt",dat.ubb.bad)
-update(mod.ubb.bad,1000)
-out.ubb.bad <- coda.samples(mod.ubb.bad,c("pi","post.n"), 1000)
-summary(out.ubb.bad)
-plot(out.ubb.bad)
-harmonic.mean(unlist(out.ubb.bad[,"post.n"]))
-dev.off()
-
-png(file="plots/bb08.png",width=900,height=450)
-dat.ubb.good <- list(a=4,b=16,x=18,n=60)
-mod.ubb.good <- jags.model("jubb.txt",dat.ubb.good)
-update(mod.ubb.good,1000)
-out.ubb.good <- coda.samples(mod.ubb.good,c("pi","post.n"), 1000)
-summary(out.ubb.good)
-plot(out.ubb.good)
-harmonic.mean(unlist(out.ubb.good[,"post.n"]))
-dev.off()
-
-
-png(file="plots/bb10.png",width=600,height=450)
-layout(matrix(c(rep(1,25),2:6),nrow=5,byrow=FALSE))
-par(mar=rep(0.6,4))
-surf1 <- persp.prior()
-p.slice(1)
-text(0.5,5.5,"Tau = 1",cex=2)
-box()
-p.slice(0.8)
-text(0.5,5.5,"Tau = 0.8",cex=2)
-box()
-p.slice(0.6)
-text(0.5,5.5,"Tau = 0.6",cex=2)
-box()
-p.slice(0.4)
-text(0.5,5.5,"Tau = 0.4",cex=2)
-box()
-p.slice(0.2)
-text(0.5,5.5,"Tau = 0.2",cex=2)
-box()
-dev.off()
-
-png(file="plots/bb11.png",width=600,height=450)
-layout(matrix(c(rep(1,25),2:6),nrow=5,byrow=FALSE))
-par(mar=rep(0.6,4))
-surf1 <- persp.prior()
-r1 <- tau.slice(0.2)
-r2 <- tau.slice(0.3)
-r3 <- tau.slice(0.5)
-r4 <- tau.slice(0.7)
-r5 <- tau.slice(0.9)
-dev.off()
-
-
-png(file="plots/bb12.png",width=900,height=300)
-layout(matrix(1:4,nrow=2,byrow=TRUE),
-       widths=c(0.5,0.5),heights=c(9,1)/10)
-par(mar=rep(0.6,4))
-surf2a <- persp.likelihood(x=18, n=60)
-surf2b <- persp.likelihood(x=54, n=60)
-ct("Likelihood for x=18, n=60")
-ct("Likelihood for x=54, n=60")
-dev.off()
-
-png(file="plots/bb13.png",width=900,height=300)
-layout(matrix(1:12,nrow=2,byrow=TRUE),
-       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
-par(mar=rep(0.6,4))
-frame()
-surf1 <- persp.prior()
-frame()
-surf2 <- persp.likelihood(x=18, n=60)
-frame()
-surf3 <- persp.posterior(x=18, n=60)
-frame()
-ct("Prior")
-ct("X")
-ct("Likelihood")
-ct(expression(phantom(0) %prop% phantom(0)))
-ct("Posterior")
-dev.off()
-
-png(file="plots/bb14.png",width=900,height=300)
-layout(matrix(1:12,nrow=2,byrow=TRUE),
-       widths=rep(c(2,8),3)/30,heights=c(9,1)/10)
-par(mar=rep(0.6,4))
-frame()
-surf1 <- persp.prior()
-frame()
-surf2 <- persp.likelihood(x=54, n=60)
-frame()
-surf3 <- persp.posterior(x=54, n=60)
-frame()
-ct("Prior")
-ct("X")
-ct("Likelihood")
-ct(expression(phantom(0) %prop% phantom(0)))
-ct("Posterior")
-dev.off()
-
 etau <- function(surf,scale=FALSE) {
   stot <- apply(surf,2,sum)
   sprb <- sweep(surf,2,stot,"/")
@@ -443,21 +316,6 @@ dev.off()
 png(file="plots/bb16.png",width=600,height=300)
 ref1 <- etau(surf1,scale=TRUE)
 box()
-dev.off()
-
-png(file="plots/bb17.png",width=450,height=450)
-par(mar=rep(0.6,4))
-surf2 <- persp.prior(hp=dens.beta0510)
-dev.off()
-
-png(file="plots/bb18.png",width=600,height=300)
-etau(surf2,scale=TRUE)
-lines(ref1,lty="dashed")
-dev.off()
-
-png(file="plots/bb19.png",width=450,height=450)
-par(mar=rep(0.6,4))
-surf3 <- persp.prior(delta=1)
 dev.off()
 ```
 
