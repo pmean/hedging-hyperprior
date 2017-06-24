@@ -67,7 +67,31 @@ out.hedge.nice <- coda.samples(mod.hedge.nice, c("pi", "tau", "post.n"), 1000)
 summary(out.hedge.nice)
 ```
 
-```{r max-hedge-trace}
+```{r draw-table-hierarchy-nasty}
+dat.hierarchy.nasty <- list(x0=3, n0=18, x=54, n=60)
+mod.hierarchy.nasty <- jags.model("jhierarchy.txt", dat.hierarchy.nasty, quiet=TRUE)
+update(mod.hierarchy.nasty, 1000)
+out.hierarchy.nasty <- coda.samples(mod.hierarchy.nasty, c("pi", "pi0", "a0", "b0"), 100000)
+summary(out.hierarchy.nasty)
+```
+
+```{r draw-table-hierarchy-nice}
+dat.hierarchy.nice <- list(x0=3, n0=18, x=18, n=60)
+mod.hierarchy.nice <- jags.model("jhierarchy.txt", dat.hierarchy.nice, quiet=TRUE)
+update(mod.hierarchy.nice, 1000)
+out.hierarchy.nice <- coda.samples(mod.hierarchy.nice, c("pi", "pi0", "a0", "b0"), 100000)
+summary(out.hierarchy.nice)
+```
+
+```{r draw-table-hierarchy-prior}
+dat.hierarchy.prior <- list(x0=10, n0=20, x=0, n=0)
+mod.hierarchy.prior <- jags.model("jhierarchy.txt", dat.hierarchy.prior, quiet=TRUE)
+update(mod.hierarchy.prior, 1000)
+out.hierarchy.prior <- coda.samples(mod.hierarchy.prior, c("pi", "pi0", "a0", "b0"), 100000)
+summary(out.hierarchy.prior)
+```
+
+```{r max-hedge-trace, eval=FALSE}
 xlist <- c(5:9, 10*(1:9), 100*(1:9), 1000*(1:9))
 nreps <- 100
 alist <- sample(xlist, nreps, replace=TRUE)

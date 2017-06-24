@@ -1,0 +1,10 @@
+model {
+  a0 ~ dnorm(0, 0.001)
+  b0 ~ dpar(1, 1)
+  u0 ~ dlogis(a0, b0)
+  logit(pi0) <- u0
+  x0 ~ dbin(pi0, n0)
+  u ~ dlogis(a0, b0)
+  logit(pi) <- u
+  x ~ dbin(pi, n)
+}

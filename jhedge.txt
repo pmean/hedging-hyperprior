@@ -1,7 +1,7 @@
 model {
  tau ~ dunif(0,1)
- a0 <- a*tau
- b0 <- b*tau
+ a0 <- 1+(a-1)*tau
+ b0 <- 1+(b-1)*tau
  pi ~ dbeta(a0,b0)
  x ~ dbin(pi,n)
  post.n <- a0+b0+n
