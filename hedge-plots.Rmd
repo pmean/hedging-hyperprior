@@ -59,7 +59,7 @@ dev.off()
 
 ```{r draw-hedging-surface}
 png(file="plots/fig3.png", width=450, height=450)
-th=40; ph=10
+th=120; ph=10
 par(mar=rep(0.6, 4))
 surf1 <- draw_prior()
 dev.off()
@@ -68,7 +68,7 @@ dev.off()
 ```{r draw-tau-slices}
 png(file="plots/fig5.png", width=450, height=450)
 par(mar=rep(0.6, 4), mfrow=c(3, 3))
-for (i in 0:8) {
+for (i in 8:0) {
   surf1 <- tau_slice((4*i+1)/34, g=35)
 }
 dev.off()
@@ -139,33 +139,36 @@ ct("Posterior")
 dev.off()
 ```
 
-```{r leftovers, eval=FALSE}
-etau <- function(surf, scale=FALSE) {
-  stot <- apply(surf, 2, sum)
-  sprb <- sweep(surf, 2, stot, "/")
-  tg <- tau.grid(100, rep=1)
-  am <- as.vector(tg %*% sprb)
-  sf <- ifelse(scale, max(am), 1)
-  am <- am/sf
-  hm <- 1/((1/post.n) %*% sprb)
-  par(mar=rep(2.6, 4))
-  plot(tg, am, type="l", ylim=c(0, 1), axes=FALSE, xlab=" ", ylab=" ")
-  axis(side=1, at=(0:10)/10)
-  axis(side=2, at=(0:4)/4)
-  title("E[tau|pi]")
-  return(list(x=tg, y=am))
-}
-
-png(file="plots/bb15.png", width=600, height=300)
-ref0 <- etau(surf1)
-box()
-dev.off()
-
-png(file="plots/bb16.png", width=600, height=300)
-ref1 <- etau(surf1, scale=TRUE)
-box()
+```{r draw-hedge-trace}
+png(file="plots/fig8.png", width=450, height=450)
+hedge_trace <- plot_hedge_trace(101)
 dev.off()
 ```
+
+```{r draw-beta-hedging-surfaces}
+par(mfrow=c(1,2))
+
+hedge_trace1 <- plot_hedge_trace(101, hp=dens.beta12)
+max(hedge_trace1$mn, na.rm=TRUE)
+
+hedge_trace2 <- plot_hedge_trace(101, hp=dens.beta21)
+max(hedge_trace2$mn, na.rm=TRUE)
+hedge_trace2 %>% filter(mn>0.5) %>% slice(n())
+
+hedge_trace3 <- plot_hedge_trace(101, hp=dens.beta19)
+max(hedge_trace3$mn, na.rm=TRUE)
+
+hedge_trace4 <- plot_hedge_trace(101, hp=dens.beta91)
+max(hedge_trace4$mn, na.rm=TRUE)
+hedge_trace4 %>% filter(mn>0.5) %>% slice(n())
+
+par(mar=rep(0.6, 4), mfrow=c(1,2))
+surf1 <- draw_prior(hp=dens.beta12,zmax=4.7)
+surf1 <- draw_prior(hp=dens.beta21,zmax=9.4)
+surf1 <- draw_prior(hp=dens.beta1T,zmax=11)
+surf1 <- draw_prior(hp=dens.betaT1,zmax=47)
+```
+
 
 ```{r save-everything}
 save.image(file="hedge-plots.RData")

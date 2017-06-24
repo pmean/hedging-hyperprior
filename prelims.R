@@ -1,5 +1,7 @@
 # These are all the preliminary libraries and the custom built functions that I need.
 
+library(dplyr)
+library(magrittr)
 library(plot3D)
 library(rjags)
 
@@ -43,11 +45,11 @@ tau_slice <- function(tau_cut, hp=dens.uniform, g=33, alpha=4, beta=16,
   tau <- cycle_slow(g, tau_max)
   pi  <- cycle_fast(g)
   d <- calculate_prior(pi, tau, g, alpha, beta, d, hp)
-  d[tau < tau_cut-delta] <- NA
+  d[tau > tau_cut+delta] <- NA
   persp3D(z=d, xlab="tau", ylab="pi",zlab="Density", zlim=c(0, zmax),
           theta=th, phi=ph, colvar=NULL, col="white", border="gray90", 
           bty="u", col.axis="gray90")
-  d[tau > tau_cut+delta] <- NA
+  d[tau < tau_cut-delta] <- NA
   persp3D(z=d, xlab="tau", ylab="pi",zlab="Density", zlim=c(0, zmax),
           theta=th, phi=ph, colvar=NULL, col="white", border="black", add=TRUE)
   return(d)
@@ -80,8 +82,12 @@ pl2 <- function(y) {
 }
 
 dens.uniform <- function(tau) {dunif(tau,0.00,1.00)}
-dens.beta0510 <- function(tau) {dbeta(tau,0.5,1)}
-dens.beta1510 <- function(tau) {dbeta(tau,1.5,1)}
+dens.beta12 <- function(tau) {dbeta(tau,1,2)}
+dens.beta19 <- function(tau) {dbeta(tau,1,9)}
+dens.beta1T <- function(tau) {dbeta(tau,1,10)}
+dens.beta21 <- function(tau) {dbeta(tau,2,1)}
+dens.beta91 <- function(tau) {dbeta(tau,9,1)}
+dens.betaT1 <- function(tau) {dbeta(tau,10,1)}
 
 calc_likelihood <- function(pi, x=54, n=60, g=33) {
   v <- dbinom(x, n, pi)
@@ -96,4 +102,25 @@ draw_likelihood <- function(x=54, n=60,
         xlab="tau", ylab="pi", zlab="Likelihood",
         zlim=c(0, max(d)))
   return(d)
+}
+
+calc_hedge_trace <- function(g=99, alpha=4, beta=16, d=1, hp=dens.uniform) {
+  tau <- cycle_slow(g)
+  pi <- cycle_fast(g)
+  v <- dbeta(pi, d+(alpha-d)*tau, d+(beta-d)*tau)*hp(tau)
+  data.frame(pi=pi, tau=tau, v=v) %>% 
+    mutate(prod=tau*v) %>%
+    group_by(pi) %>%
+    summarize(num=sum(prod, na.rm=TRUE), den=sum(v, na.rm=TRUE)) %>%
+    ungroup %>%
+    mutate(mn=num/den) %>%
+    return
+}
+
+
+plot_hedge_trace <- function(g=99, alpha=4, beta=16, d=1, hp=dens.uniform) {
+  hedge_trace <- calc_hedge_trace(g, alpha, beta, d, hp)
+  plot(hedge_trace$pi, hedge_trace$mn, type="l", ylim=c(0,1),
+       xlab="pi", ylab="Expected value of tau")
+  return(hedge_trace)
 }

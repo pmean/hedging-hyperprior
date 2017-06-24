@@ -67,6 +67,21 @@ out.hedge.nice <- coda.samples(mod.hedge.nice, c("pi", "tau", "post.n"), 1000)
 summary(out.hedge.nice)
 ```
 
+```{r max-hedge-trace}
+xlist <- c(5:9, 10*(1:9), 100*(1:9), 1000*(1:9))
+nreps <- 100
+alist <- sample(xlist, nreps, replace=TRUE)
+blist <- sample(xlist, nreps, replace=TRUE)
+m <- rep(NA, nreps)
+i <- 0
+for (i in 1:nreps) {
+  m[i] <- max(calc_hedge_trace(g=999, a=alist[i], b=blist[i])$mn, na.rm=TRUE)
+}
+cat("\n")
+range(m, na.rm=TRUE)
+1 / max(m, na.rm=TRUE)
+```
+
 ```{r save-everything}
 save.image(file="hedge-output.RData")
 ```
