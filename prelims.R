@@ -4,9 +4,15 @@ library(dplyr)
 library(magrittr)
 library(plot3D)
 library(rjags)
+library(rstan)
+library(tidyr)
 
 # start with a blank slate
 rm(list=ls())
+
+# these are some recommended setting for stan
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
 
 cycle_fast <- function(g=1001, cmax=1, rep=g) {
   cyc <- seq(0, cmax, length=g)

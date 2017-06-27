@@ -4,5 +4,6 @@ plots/*.*
 *.doc
 *.docx
 *.html
+*.rds
 *.RData
 *.Rproj

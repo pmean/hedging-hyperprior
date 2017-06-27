@@ -83,12 +83,62 @@ out.hierarchy.nice <- coda.samples(mod.hierarchy.nice, c("pi", "pi0", "a0", "b0"
 summary(out.hierarchy.nice)
 ```
 
+```{r draw-table-hierarchy-matched}
+dat.hierarchy.matched <- list(x0=3, n0=18, x=12, n=60)
+mod.hierarchy.matched <- jags.model("jhierarchy.txt", dat.hierarchy.matched, quiet=TRUE)
+update(mod.hierarchy.matched, 1000)
+out.hierarchy.matched <- coda.samples(mod.hierarchy.matched, c("pi", "pi0", "a0", "b0", "nx"), 100000)
+summary(out.hierarchy.matched)
+```
+
 ```{r draw-table-hierarchy-prior}
 dat.hierarchy.prior <- list(x0=10, n0=20, x=0, n=0)
 mod.hierarchy.prior <- jags.model("jhierarchy.txt", dat.hierarchy.prior, quiet=TRUE)
 update(mod.hierarchy.prior, 1000)
 out.hierarchy.prior <- coda.samples(mod.hierarchy.prior, c("pi", "pi0", "a0", "b0"), 100000)
 summary(out.hierarchy.prior)
+```
+
+```{r stan-hierarchical-nasty}
+dat_stan <- list(
+  J=2, y=c(4, 54), n=c(20, 60)
+)
+f <- "stan_hierarchy.stan"
+fit_stan1 <- stan(file=f, data=dat_stan,
+  control = list(adapt_delta = 0.99),                  
+  iter= 10000, warmup=1000, chains = 4)
+fit_stan1                                         %>%
+  as.data.frame                                 -> sim_gp1
+pairs(fit_stan1)
+summary(fit_stan1)
+```
+
+```{r stan-hierarchical-nice}
+dat_stan <- list(
+  J=2, y=c(4, 18), n=c(20, 60)
+)
+f <- "stan_hierarchy.stan"
+fit_stan2 <- stan(file=f, data=dat_stan,
+  control = list(adapt_delta = 0.99),                  
+  iter= 10000, warmup=1000, chains = 4)
+fit_stan2                                         %>%
+  as.data.frame                                 -> sim_gp2
+summary(fit_stan2)
+pairs(fit_stan2)
+```
+
+```{r stan-hierarchical-match}
+dat_stan <- list(
+  J=2, y=c(4, 12), n=c(20, 60)
+)
+f <- "stan_hierarchy.stan"
+fit_stan3 <- stan(file=f, data=dat_stan,
+  control = list(adapt_delta = 0.99),                  
+  iter= 10000, warmup=1000, chains = 4)
+fit_stan3                                         %>%
+  as.data.frame                                 -> sim_gp3
+summary(fit_stan3)
+pairs(fit_stan3)
 ```
 
 ```{r max-hedge-trace, eval=FALSE}
