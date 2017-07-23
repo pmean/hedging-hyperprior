@@ -28,13 +28,13 @@ cycle_slow(3)
 
 matrix(cycle_fast(3), nrow=3, byrow=TRUE)
 
-calculate_prior <- function(pi, tau, g=21, alpha=4, beta=16, d=1, hp=dens.uniform) {
+calculate_prior <- function(pi, tau, g=21, alpha=4, beta=16, d=1, hp=dens.uniform10) {
   v <- dbeta(pi, d+(alpha-d)*tau, d+(beta-d)*tau)*hp(tau)
   # with byrow=TRUE, cycle_slow is the rows (x) and cycle_fast is the columns (y)
   matrix(v, nrow=g, byrow=TRUE)
 }
 
-draw_prior <- function(hp=dens.uniform, g=33, alpha=4, beta=16,
+draw_prior <- function(hp=dens.uniform10, g=33, alpha=4, beta=16,
                        tau_max=1, d=1, zmax=4.7) {
   tau <- cycle_slow(g, tau_max)
   pi  <- cycle_fast(g)
@@ -45,7 +45,7 @@ draw_prior <- function(hp=dens.uniform, g=33, alpha=4, beta=16,
   return(d)
 }
 
-tau_slice <- function(tau_cut, hp=dens.uniform, g=33, alpha=4, beta=16,
+tau_slice <- function(tau_cut, hp=dens.uniform10, g=33, alpha=4, beta=16,
                       tau_max=1, d=1, zmax=4.7) {
   delta <- 1E-2
   tau <- cycle_slow(g, tau_max)
@@ -61,7 +61,7 @@ tau_slice <- function(tau_cut, hp=dens.uniform, g=33, alpha=4, beta=16,
   return(d)
 }
 
-pi_slice <- function(pi_cut, hp=dens.uniform, g=33, alpha=4, beta=16,
+pi_slice <- function(pi_cut, hp=dens.uniform10, g=33, alpha=4, beta=16,
                      tau_max=1, d=1, zmax=4.7) {
   delta <- 1E-2
   tau <- cycle_slow(g, tau_max)
@@ -87,7 +87,9 @@ pl2 <- function(y) {
   axis(side=1,at=(0:10)/10,cex=2)
 }
 
-dens.uniform <- function(tau) {dunif(tau,0.00,1.00)}
+dens.uniform10 <- function(tau) {dunif(tau, 0, 1)}
+dens.uniform20 <- function(tau) {dunif(tau, 0, 2)}
+dens.uniform <- dens.uniform10
 dens.beta12 <- function(tau) {dbeta(tau,1,2)}
 dens.beta19 <- function(tau) {dbeta(tau,1,9)}
 dens.beta1T <- function(tau) {dbeta(tau,1,10)}
@@ -110,23 +112,25 @@ draw_likelihood <- function(x=54, n=60,
   return(d)
 }
 
-calc_hedge_trace <- function(g=99, alpha=4, beta=16, d=1, hp=dens.uniform) {
-  tau <- cycle_slow(g)
+calc_hedge_trace <- function(g=99, alpha=4, beta=16, d=1, hp=dens.uniform, tau_limit=1) {
+  tau <- cycle_slow(g)*tau_limit
   pi <- cycle_fast(g)
-  v <- dbeta(pi, d+(alpha-d)*tau, d+(beta-d)*tau)*hp(tau)
+  v <- dbeta(pi, d+(alpha-d)*tau, d+(beta-d)*tau)*hp(tau/tau_limit)
   data.frame(pi=pi, tau=tau, v=v) %>% 
     mutate(prod=tau*v) %>%
     group_by(pi) %>%
     summarize(num=sum(prod, na.rm=TRUE), den=sum(v, na.rm=TRUE)) %>%
     ungroup %>%
     mutate(mn=num/den) %>%
+    rename(x=pi) %>%
+    rename(y=mn) %>%
+    select(x, y) %>%
     return
 }
 
-
-plot_hedge_trace <- function(g=99, alpha=4, beta=16, d=1, hp=dens.uniform) {
-  hedge_trace <- calc_hedge_trace(g, alpha, beta, d, hp)
-  plot(hedge_trace$pi, hedge_trace$mn, type="l", ylim=c(0,1),
+plot_hedge_trace <- function(g=99, alpha=4, beta=16, d=1, hp=dens.uniform, tau_limit=1) {
+  hedge_trace <- calc_hedge_trace(g, alpha, beta, d, hp, tau_limit)
+  plot(hedge_trace$x, hedge_trace$y, type="l", ylim=c(0,1),
        xlab="pi", ylab="Expected value of tau")
   return(hedge_trace)
 }
